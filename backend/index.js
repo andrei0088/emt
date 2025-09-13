@@ -4,6 +4,7 @@ import cors from "cors";
 import crypto from "crypto";
 import pg from "pg";
 import bcrypt from "bcrypt";
+import session from "express-session";
 
 dotenv.config();
 const app = express();
@@ -29,6 +30,14 @@ app.use(
     origin: FRONTEND_URL,
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
+  })
+);
+app.use(
+  session({
+    secret: "secret",
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false },
   })
 );
 
@@ -58,7 +67,7 @@ app.post("/registration", (req, res) => {
         });
       } else {
         await db.query(
-          "INSERT INTO users(name, username, tocken, password) VALUES($1, $2, $3, $4)",
+          "INSERT INTO users(name, username, token, password) VALUES($1, $2, $3, $4)",
           [name, user, token, hash]
         );
         res.send({ success: true, name, user, token });
@@ -79,7 +88,12 @@ app.post("/login", async (req, res) => {
   ]);
   if (answer.rowCount) {
     if (await bcrypt.compare(token, answer.rows[0].password)) {
-      res.send({ message: answer });
+      req.session.user = {
+        user: answer.rows[0].username,
+        name: answer.rows[0].name,
+      };
+
+      res.send({ success: true, user: req.session.user });
     } else {
       res.send({
         success: false,
@@ -96,9 +110,11 @@ app.post("/login", async (req, res) => {
 
 // Session route
 app.get("/me", (req, res) => {
-  res.send("session validate route");
+  if (!req.session.user) {
+    return res.status(401).send({ success: false, message: "Not logged in" });
+  }
+  res.send({ success: true, user: req.session.user });
 });
-
 // App is starting
 app.listen(port, () => {
   console.log("App started and listening: " + port);
