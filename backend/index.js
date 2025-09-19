@@ -11,8 +11,9 @@ const app = express();
 
 //  .env
 const port = process.env.PORT;
-const FRONTEND_URL = process.env.FRONTEND_URL;
+const FRONTEND_URL = process.env.REACT;
 const saltRounds = parseInt(process.env.SALT);
+const secret = process.env.SESSION_SECRET;
 
 // Global data
 
@@ -34,7 +35,7 @@ app.use(
 );
 app.use(
   session({
-    secret: "secret",
+    secret: secret,
     resave: false,
     saveUninitialized: true,
     cookie: { secure: false },
@@ -111,9 +112,9 @@ app.post("/login", async (req, res) => {
 // Session route
 app.get("/me", (req, res) => {
   if (!req.session.user) {
-    return res.status(401).send({ success: false, message: "Not logged in" });
+    return res.send({ success: false, message: "Not logged in" });
   }
-  res.send({ success: true, user: req.session.user });
+  res.send({ success: true, user: req.session });
 });
 // App is starting
 app.listen(port, () => {
