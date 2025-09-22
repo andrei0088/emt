@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 
 const codOptions = [
   { value: 5, label: "Negru", color: "bg-black text-white" },
@@ -19,6 +19,10 @@ const locOptions = ["Focar", "PRV", "PMA", "Evacuare"];
 const EditVictima = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const from = location.state?.from || "/";
+
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -102,7 +106,7 @@ const EditVictima = () => {
 
       if (res.data.success) {
         // alert("Victimă modificată cu succes!");
-        navigate("/");
+        navigate(from);
       }
     } catch (err: any) {
       console.error(err.response?.data || err.message);

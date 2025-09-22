@@ -1,6 +1,6 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface Victima {
   id: number;
@@ -20,6 +20,8 @@ interface DisplayVictimeProps {
 
 const DisplayVictime: React.FC<DisplayVictimeProps> = ({ name, lvl, p }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [victime, setVictime] = useState<Victima[]>([]);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ const DisplayVictime: React.FC<DisplayVictimeProps> = ({ name, lvl, p }) => {
   }, [name]);
 
   const handleEdit = (id: number) => {
-    navigate(`/editv/${id}`);
+    navigate(`/editv/${id}`, { state: { from: location.pathname } });
     // alert(`Modifică victima cu ID: ${id}`);
   };
 

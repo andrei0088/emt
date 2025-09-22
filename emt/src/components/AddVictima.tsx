@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const codOptions = [
   { value: 5, label: "Negru", color: "bg-black text-white" },
@@ -34,6 +34,9 @@ const getDefaultLoc = (lvl: number) => {
 
 const AddVictima = ({ lvl }: { lvl: number }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const from = location.state?.from || "/";
 
   const [formData, setFormData] = useState({
     loc: getDefaultLoc(lvl),
@@ -75,7 +78,6 @@ const AddVictima = ({ lvl }: { lvl: number }) => {
       );
 
       if (res.data.success) {
-        alert("Victimă adăugată cu succes!");
         setFormData({
           loc: getDefaultLoc(lvl),
           codqr: "",
@@ -85,7 +87,7 @@ const AddVictima = ({ lvl }: { lvl: number }) => {
           varsta: "",
           sex: "",
         });
-        navigate("/");
+        navigate(from);
       }
     } catch (err: any) {
       console.error(err.response?.data || err.message);

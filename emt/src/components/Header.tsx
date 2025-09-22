@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 
 const Header = ({ name, lvl, setUser }) => {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const location = useLocation();
 
   const handleLogout = async () => {
     try {
@@ -47,7 +48,8 @@ const Header = ({ name, lvl, setUser }) => {
           <li>
             {lvl > 9 && (
               <Link
-                to="/addvictima"
+                to="/addvictima/"
+                state={{ from: location.pathname }}
                 className="hover:text-gray-900 transition-colors duration-200"
               >
                 Adaugă Victimă
