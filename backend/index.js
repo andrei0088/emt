@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import crypto from "crypto";
 import pg from "pg";
+import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import session from "express-session";
 import passport from "passport";
@@ -10,18 +11,18 @@ import { Strategy as LocalStrategy } from "passport-local";
 
 dotenv.config();
 const app = express();
-
-// Config
 const port = process.env.PORT || 3030;
 const FRONTEND_URL = process.env.REACT;
 const saltRounds = parseInt(process.env.SALT || "10");
 const secret = process.env.SESSION_SECRET;
 
-// PostgreSQL connection
+// PostgreSQL
 const db = new pg.Client({ connectionString: process.env.DB });
 db.connect()
   .then(() => console.log("Conectat la PostgreSQL"))
   .catch((err) => console.error("Eroare la conectare:", err));
+
+const PgSession = connectPgSimple(session);
 
 // Middleware
 app.use(
@@ -35,7 +36,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
-    secret: secret,
+    store: new PgSession({
+      pool: db,
+      tableName: "session",
+      createTableIfMissing: true,
+    }),
+    secret,
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 },
@@ -44,7 +50,7 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Passport local strategy
+// Passport
 passport.use(
   new LocalStrategy(async (username, password, done) => {
     try {
@@ -53,18 +59,15 @@ passport.use(
       ]);
       if (result.rowCount === 0)
         return done(null, false, { message: "User not found" });
-
       const user = result.rows[0];
       const match = await bcrypt.compare(password, user.password);
       if (!match) return done(null, false, { message: "Invalid password" });
-
       return done(null, user);
     } catch (err) {
       return done(err);
     }
   })
 );
-
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   try {
@@ -78,6 +81,9 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
+// Middleware admin
+const adminCheck = (req, res) => !req.isAuthenticated() || req.user.lvl !== 99;
+
 // Routes
 app.get("/", (req, res) => res.send("main route"));
 
@@ -87,16 +93,16 @@ app.post("/registration", async (req, res) => {
     const { name, user } = req.body;
     if (!name || !user) return res.status(400).send({ err: "Missing fields" });
 
-    const answer = await db.query("SELECT * FROM users WHERE username = $1", [
+    const exists = await db.query("SELECT * FROM users WHERE username = $1", [
       user,
     ]);
-    if (answer.rowCount)
+    if (exists.rowCount)
       return res.send({ success: false, err: "User already exists" });
 
     const token = crypto.randomBytes(20).toString("hex");
     const hash = await bcrypt.hash(token, saltRounds);
     await db.query(
-      "INSERT INTO users(name, username, token, password) VALUES($1, $2, $3, $4)",
+      "INSERT INTO users(name, username, token, password) VALUES($1,$2,$3,$4)",
       [name, user, token, hash]
     );
 
@@ -111,7 +117,6 @@ app.post("/registration", async (req, res) => {
 app.post("/login", (req, res, next) => {
   if (!req.body.token)
     return res.status(400).send({ success: false, message: "Token missing" });
-
   const [username, password] = req.body.token.split("|");
 
   passport.authenticate("local", (err, user, info) => {
@@ -152,139 +157,38 @@ app.post("/logout", (req, res) => {
   });
 });
 
-// Admin routes
-const adminCheck = (req, res) => !req.isAuthenticated() || req.user.lvl !== 99;
+// -----------------
+// Victime routes
+// -----------------
 
-app.get("/admin/users", async (req, res) => {
-  if (adminCheck(req, res))
-    return res.status(403).send({ success: false, message: "Forbidden" });
-  try {
-    const result = await db.query(
-      "SELECT id, name, username, lvl, created_at FROM users ORDER BY created_at DESC"
-    );
-    res.send({ success: true, users: result.rows });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .send({ success: false, message: "Server error", error: err.message });
-  }
-});
-
-app.post("/admin/approve/:id", async (req, res) => {
-  if (adminCheck(req, res))
-    return res.status(403).send({ success: false, message: "Forbidden" });
-  try {
-    const userId = req.params.id;
-    const result = await db.query("UPDATE users SET lvl = 1 WHERE id = $1", [
-      userId,
-    ]);
-    if (result.rowCount === 0)
-      return res
-        .status(404)
-        .send({ success: false, message: "User not found" });
-    res.send({ success: true, message: "User approved" });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .send({ success: false, message: "Server error", error: err.message });
-  }
-});
-
-app.post("/admin/regenerate/:id", async (req, res) => {
-  if (adminCheck(req, res))
-    return res.status(403).send({ success: false, message: "Forbidden" });
-  try {
-    const userId = req.params.id;
-    const token = crypto.randomBytes(20).toString("hex");
-    const hash = await bcrypt.hash(token, saltRounds);
-    const result = await db.query(
-      "UPDATE users SET token = $1, password = $2 WHERE id = $3",
-      [token, hash, userId]
-    );
-    if (result.rowCount === 0)
-      return res
-        .status(404)
-        .send({ success: false, message: "User not found" });
-
-    const getuser = await db.query("SELECT username FROM users WHERE id = $1", [
-      userId,
-    ]);
-    console.log("New token for user", getuser.rows[0].username, "is", token);
-
-    res.send({
-      success: true,
-      message: "User regenerated",
-      token,
-      user: getuser.rows[0].username,
-    });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .send({ success: false, message: "Server error", error: err.message });
-  }
-});
-
-app.post("/admin/delete/:id", async (req, res) => {
-  if (adminCheck(req, res))
-    return res.status(403).send({ success: false, message: "Forbidden" });
-  try {
-    const userId = req.params.id;
-    const result = await db.query("DELETE FROM users WHERE id = $1", [userId]);
-    if (result.rowCount === 0)
-      return res
-        .status(404)
-        .send({ success: false, message: "User not found" });
-    res.send({ success: true, message: "User deleted" });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .send({ success: false, message: "Server error", error: err.message });
-  }
-});
-
-// Add Victimă (toate utilizatorii logați, lvl !== 0)
+// Add Victima
 app.post("/addvictima", async (req, res) => {
-  if (!req.isAuthenticated() || req.user.lvl === 0) {
+  if (!req.isAuthenticated() || req.user.lvl === 0)
     return res.status(403).send({ success: false, message: "Forbidden" });
-  }
 
   const { loc, codqr, cod, nume, prenume, varsta, sex } = req.body;
-
-  // Convertim la integer doar dacă există valoare, altfel null
   const codInt = cod ? parseInt(cod) : null;
   const varstaInt = varsta ? parseInt(varsta) : null;
 
   try {
-    // 1. Inserare victimă
-    const insertVictimaText = `
-      INSERT INTO victime (codqr, cod, nume, prenume, varsta, sex)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id
-    `;
-    const result = await db.query(insertVictimaText, [
-      codqr || null,
-      codInt,
-      nume || null,
-      prenume || null,
-      varstaInt,
-      sex || null,
-    ]);
-    const victimaId = result.rows[0].id;
-
-    // 2. Inserare în tabela locului
-    const allowedTables = ["focar", "prv", "pma", "evacuat"];
-    if (!allowedTables.includes(loc?.toLowerCase())) {
-      return res.status(400).send({ success: false, message: "Loc invalid" });
-    }
-
-    await db.query(
-      `INSERT INTO ${loc.toLowerCase()} (victima_id) VALUES ($1)`,
-      [victimaId]
+    const insertVictima = await db.query(
+      `INSERT INTO victime (codqr, cod, nume, prenume, varsta, sex)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [
+        codqr || null,
+        codInt,
+        nume || null,
+        prenume || null,
+        varstaInt,
+        sex || null,
+      ]
     );
+    const victimaId = insertVictima.rows[0].id;
+
+    await db.query(`INSERT INTO loc_victima (victima_id, loc) VALUES ($1,$2)`, [
+      victimaId,
+      loc,
+    ]);
 
     res.send({ success: true, victimaId });
   } catch (err) {
@@ -293,33 +197,76 @@ app.post("/addvictima", async (req, res) => {
   }
 });
 
-app.get("/gedvictime/:loc", async (req, res) => {
-  if (!req.isAuthenticated() || req.user.lvl === 0) {
+// Get victime by loc
+app.get("/getvictime/:loc", async (req, res) => {
+  if (!req.isAuthenticated() || req.user.lvl === 0)
     return res.status(403).send({ success: false, message: "Forbidden" });
-  }
 
   const loc = req.params.loc.toLowerCase();
-  const allowedTables = ["focar", "prv", "pma", "evacuat"];
-  if (!allowedTables.includes(loc)) {
-    return res.status(400).send({ success: false, message: "Loc invalid" });
+  try {
+    const result = await db.query(
+      `SELECT v.*
+       FROM victime v
+       JOIN loc_victima l ON v.id = l.victima_id
+       WHERE l.loc = $1`,
+      [loc]
+    );
+    res.send({ success: true, victime: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, error: err.message });
   }
+});
+
+// Get victima by id
+app.get("/victime/:id", async (req, res) => {
+  const victimaId = req.params.id;
+  try {
+    const result = await db.query("SELECT * FROM victime WHERE id = $1", [
+      victimaId,
+    ]);
+    const loc = await db.query(
+      "SELECT loc FROM loc_victima WHERE victima_id = $1",
+      [victimaId]
+    );
+    if (result.rows.length === 0)
+      return res
+        .status(404)
+        .send({ success: false, message: "Victima nu a fost găsită." });
+    result.rows[0].loc = loc.rows[0].loc;
+    res.send({ success: true, victima: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, error: err.message });
+  }
+});
+
+// Update victima
+app.put("/victime/:id", async (req, res) => {
+  const victimaId = req.params.id;
+  const { cod, codqr, nume, prenume, varsta, sex, loc } = req.body;
 
   try {
-    // Obținem toate id-urile din tabela locului
-    const idsResult = await db.query(`SELECT victima_id FROM ${loc}`);
-    const victime = [];
+    const result = await db.query(
+      `UPDATE victime
+       SET cod = $1, codqr = $2, nume = $3, prenume = $4, varsta = $5, sex = $6
+       WHERE id = $7 RETURNING *`,
+      [cod, codqr, nume, prenume, varsta, sex, victimaId]
+    );
 
-    for (const row of idsResult.rows) {
-      const victimaResult = await db.query(
-        "SELECT * FROM victime WHERE id = $1",
-        [row.victima_id]
+    if (result.rows.length === 0)
+      return res
+        .status(404)
+        .send({ success: false, message: "Victima nu a fost găsită." });
+
+    if (loc) {
+      await db.query(
+        `UPDATE loc_victima SET loc = $1, updated_at = NOW() WHERE victima_id = $2`,
+        [loc.toLowerCase(), victimaId]
       );
-      if (victimaResult.rowCount > 0) {
-        victime.push(victimaResult.rows[0]);
-      }
     }
 
-    res.send({ success: true, victime });
+    res.send({ success: true, victima: result.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).send({ success: false, error: err.message });
@@ -327,6 +274,4 @@ app.get("/gedvictime/:loc", async (req, res) => {
 });
 
 // Start server
-app.listen(port, () =>
-  console.log("🚀 App started and listening on port " + port)
-);
+app.listen(port, () => console.log("🚀 App started on port " + port));

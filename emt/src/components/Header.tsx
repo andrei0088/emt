@@ -45,12 +45,14 @@ const Header = ({ name, lvl, setUser }) => {
             </Link>
           </li>
           <li>
-            <Link
-              to="/addvictima"
-              className="hover:text-gray-900 transition-colors duration-200"
-            >
-              Adauga victima
-            </Link>
+            {lvl > 9 && (
+              <Link
+                to="/addvictima"
+                className="hover:text-gray-900 transition-colors duration-200"
+              >
+                Adaugă Victimă
+              </Link>
+            )}
           </li>
           <li>
             <Link
@@ -74,6 +76,14 @@ const Header = ({ name, lvl, setUser }) => {
               className="hover:text-gray-900 transition-colors duration-200"
             >
               PMA
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/evacuare"
+              className="hover:text-gray-900 transition-colors duration-200"
+            >
+              Evacuare
             </Link>
           </li>
           <li>

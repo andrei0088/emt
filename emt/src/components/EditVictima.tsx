@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 const codOptions = [
   { value: 5, label: "Negru", color: "bg-black text-white" },
@@ -14,40 +14,61 @@ const codOptions = [
   },
 ];
 
-const locOptions = ["Focar", "PRV", "PMA", "Evacuat"];
+const locOptions = ["Focar", "PRV", "PMA", "Evacuare"];
 
-// Funcție care calculează locul default în funcție de lvl
-const getDefaultLoc = (lvl: number) => {
-  switch (true) {
-    case lvl < 10:
-      return "Focar";
-    case lvl < 20:
-      return "PRV";
-    case lvl < 30:
-      return "PMA";
-    case lvl < 40:
-      return "Evacuat";
-    default:
-      return "Focar";
-  }
-};
-
-const AddVictima = ({ lvl }: { lvl: number }) => {
+const EditVictima = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const [formData, setFormData] = useState({
-    loc: getDefaultLoc(lvl),
+    loc: "",
     codqr: "",
-    cod: null,
+    cod: null as number | null,
     nume: "",
     prenume: "",
     varsta: "",
     sex: "",
   });
 
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  // Fetch victima data
+  useEffect(() => {
+    const fetchVictima = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL}/victime/${id}`,
+          { withCredentials: true }
+        );
 
+        if (res.data.success) {
+          const v = res.data.victima;
+
+          // Selectează locul corect din locOptions
+          const locFormatted = v.loc
+            ? locOptions.find((l) => l.toLowerCase() === v.loc.toLowerCase()) ||
+              v.loc
+            : "";
+
+          setFormData({
+            loc: locFormatted,
+            codqr: v.codqr || "",
+            cod: v.cod !== undefined ? Number(v.cod) : null,
+            nume: v.nume || "",
+            prenume: v.prenume || "",
+            varsta: v.varsta !== undefined ? String(v.varsta) : "",
+            sex: v.sex || "",
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchVictima();
+  }, [id]);
+
+  // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -57,34 +78,30 @@ const AddVictima = ({ lvl }: { lvl: number }) => {
         setDropdownOpen(false);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/addvictima`,
-        {
-          ...formData,
-          cod: Number(formData.cod),
-          loc: formData.loc.toLowerCase(),
-        },
+      const payload = {
+        ...formData,
+        cod: formData.cod !== null ? Number(formData.cod) : null,
+        varsta: formData.varsta !== "" ? Number(formData.varsta) : null,
+        loc: formData.loc,
+      };
+
+      const res = await axios.put(
+        `${import.meta.env.VITE_API_URL}/victime/${id}`,
+        payload,
         { withCredentials: true }
       );
 
       if (res.data.success) {
-        alert("Victimă adăugată cu succes!");
-        setFormData({
-          loc: getDefaultLoc(lvl),
-          codqr: "",
-          cod: null,
-          nume: "",
-          prenume: "",
-          varsta: "",
-          sex: "",
-        });
+        // alert("Victimă modificată cu succes!");
         navigate("/");
       }
     } catch (err: any) {
@@ -94,9 +111,8 @@ const AddVictima = ({ lvl }: { lvl: number }) => {
 
   return (
     <div className="max-w-lg mx-auto mt-10 bg-white p-8 rounded-xl shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-center">Adaugă Victimă</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center">Modifică Victimă</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Input cod QR primul și autofocus */}
         <input
           type="text"
           name="codqr"
@@ -107,7 +123,6 @@ const AddVictima = ({ lvl }: { lvl: number }) => {
           autoFocus
         />
 
-        {/* Radio loc */}
         <div className="space-y-2">
           <p className="font-semibold">Loc</p>
           <div className="flex gap-4">
@@ -166,7 +181,6 @@ const AddVictima = ({ lvl }: { lvl: number }) => {
           )}
         </div>
 
-        {/* Restul câmpurilor */}
         <input
           type="text"
           name="nume"
@@ -206,13 +220,13 @@ const AddVictima = ({ lvl }: { lvl: number }) => {
 
         <button
           type="submit"
-          className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition-colors"
+          className="w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition-colors"
         >
-          Adaugă Victimă
+          Salvează Modificările
         </button>
       </form>
     </div>
   );
 };
 
-export default AddVictima;
+export default EditVictima;

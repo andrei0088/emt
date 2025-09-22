@@ -11,6 +11,7 @@ import Admin from "./components/Admin";
 import Registerd from "./components/Registerd";
 import NotFound from "./components/NotFound";
 import AddVictima from "./components/AddVictima";
+import EditVictima from "./components/EditVictima";
 
 // positions
 import PRV from "./positions/PRV";
@@ -70,12 +71,26 @@ function App() {
             ) : user.lvl === 0 ? (
               <Navigate to="/waiting" />
             ) : (
-              <AddVictima />
+              <AddVictima lvl={user?.lvl} />
             )
           }
         />
 
-        {/* AddVictim */}
+        {/* EditVictim */}
+        <Route
+          path="/editv/:id"
+          element={
+            !user ? (
+              <Navigate to="/login" />
+            ) : user.lvl === 0 ? (
+              <Navigate to="/waiting" />
+            ) : (
+              <EditVictima lvl={user?.lvl} />
+            )
+          }
+        />
+
+        {/* Focar */}
         <Route
           path="/focar"
           element={
@@ -84,7 +99,7 @@ function App() {
             ) : user.lvl === 0 ? (
               <Navigate to="/waiting" />
             ) : (
-              <DisplayVictime name="Focar" />
+              <DisplayVictime name="Focar" lvl={user?.lvl} />
             )
           }
         />
@@ -98,7 +113,7 @@ function App() {
             ) : user.lvl === 0 ? (
               <Navigate to="/waiting" />
             ) : (
-              <DisplayVictime name="PRV" />
+              <DisplayVictime name="PRV" lvl={user?.lvl} />
             )
           }
         />
@@ -111,7 +126,34 @@ function App() {
             ) : user.lvl === 0 ? (
               <Navigate to="/waiting" />
             ) : (
-              <DisplayVictime name="PMA" />
+              <DisplayVictime name="PMA" lvl={user?.lvl} />
+            )
+          }
+        />
+        {/* Evacuare */}
+        <Route
+          path="/evacuare"
+          element={
+            !user ? (
+              <Navigate to="/login" />
+            ) : user.lvl === 0 ? (
+              <Navigate to="/waiting" />
+            ) : (
+              <DisplayVictime name="Evacuare" lvl={user?.lvl} />
+            )
+          }
+        />
+
+        {/* DSM */}
+        <Route
+          path="/dsm"
+          element={
+            !user ? (
+              <Navigate to="/login" />
+            ) : user.lvl === 0 ? (
+              <Navigate to="/waiting" />
+            ) : (
+              <DisplayVictime name="DSM" lvl={user?.lvl} />
             )
           }
         />

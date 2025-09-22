@@ -1,5 +1,6 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface Victima {
   id: number;
@@ -17,12 +18,13 @@ interface DisplayVictimeProps {
   name: string;
 }
 
-const DisplayVictime: React.FC<DisplayVictimeProps> = ({ name }) => {
+const DisplayVictime: React.FC<DisplayVictimeProps> = ({ name, lvl, p }) => {
+  const navigate = useNavigate();
   const [victime, setVictime] = useState<Victima[]>([]);
 
   useEffect(() => {
     axios
-      .get(`${import.meta.env.VITE_API_URL}/gedvictime/${name}`, {
+      .get(`${import.meta.env.VITE_API_URL}/getvictime/${name}`, {
         withCredentials: true,
       })
       .then((res) => {
@@ -36,7 +38,8 @@ const DisplayVictime: React.FC<DisplayVictimeProps> = ({ name }) => {
   }, [name]);
 
   const handleEdit = (id: number) => {
-    alert(`Modifică victima cu ID: ${id}`);
+    navigate(`/editv/${id}`);
+    // alert(`Modifică victima cu ID: ${id}`);
   };
 
   const getRowColor = (cod: string | null) => {
@@ -71,28 +74,32 @@ const DisplayVictime: React.FC<DisplayVictimeProps> = ({ name }) => {
                   {key}
                 </th>
               ))}
-              <th className="py-2 px-4 border-b">Acțiuni</th>
+              {lvl > 10 && <th className="py-2 px-4 border-b">Acțiuni</th>}
             </tr>
           </thead>
           <tbody>
             {victime.map((v) => (
               <tr
                 key={v.id}
-                className={`${getRowColor(v.cod)} hover:bg-gray-200`}
+                className={`${getRowColor(
+                  v.cod
+                )} hover:opacity-70 transition-opacity duration-200`}
               >
                 {Object.values(v).map((value, idx) => (
                   <td key={idx} className="py-2 px-4 border-b">
                     {value ?? "—"}
                   </td>
                 ))}
-                <td className="py-2 px-4 border-b">
-                  <button
-                    className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                    onClick={() => handleEdit(v.id)}
-                  >
-                    Modifică
-                  </button>
-                </td>
+                {lvl > 10 && (
+                  <td className="py-2 px-4 border-b edit">
+                    <button
+                      className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                      onClick={() => handleEdit(v.id)}
+                    >
+                      Modifică
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -83,6 +83,17 @@ const Admin = () => {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6">Panou Admin</h1>
+      <h2>Lvl - Nivel atribute:</h2>
+      <ul>
+        <li>1-9 - Spectatori</li>
+        <li>10 - Focar</li>
+        <li>20 - PRV</li>
+        <li>30 - Intrare PMA</li>
+        <li>40 - PMA</li>
+        <li>50 - Evacuare </li>
+        <li>60 - ofiter DSM</li>
+        <li>90 - DSM</li>
+      </ul>
       {users.length === 0 ? (
         <p>Nu există utilizatori.</p>
       ) : (
